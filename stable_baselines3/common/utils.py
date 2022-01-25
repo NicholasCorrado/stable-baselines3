@@ -8,7 +8,9 @@ from typing import Dict, Iterable, Optional, Tuple, Union
 
 import gym
 import numpy as np
+import torch
 import torch as th
+from torch import nn
 
 import stable_baselines3 as sb3
 
@@ -503,3 +505,28 @@ def get_system_info(print_info: bool = True) -> Tuple[Dict[str, str], str]:
     if print_info:
         print(env_info_str)
     return env_info, env_info_str
+
+def load_pca_transformation(path_to_dir, latent_dim, native_dim):
+
+    if latent_dim != -1:
+        W = np.load(f'{path_to_dir}/W.npy')
+        mu = np.load(f'{path_to_dir}/mu.npy')
+    else:
+        W = np.eye(native_dim)
+        mu = np.zeros(native_dim)
+
+    native_dim = W.shape[0]
+    W_latent = nn.Linear(latent_dim, native_dim, bias=False)
+
+    mu_latent = torch.from_numpy(mu)
+    mu_latent.requires_grad = False
+
+    W = W[:latent_dim, :]
+    W = torch.from_numpy(W.T).type(torch.float)
+    if W.shape[0] == 1:
+        W = W.unsqueeze(0)
+    with torch.no_grad():
+        W_latent.weight = torch.nn.Parameter(W)
+    W_latent.weight.requires_grad = False
+
+    return W_latent.type(torch.float), mu_latent.type(torch.float)
