@@ -506,11 +506,14 @@ def get_system_info(print_info: bool = True) -> Tuple[Dict[str, str], str]:
         print(env_info_str)
     return env_info, env_info_str
 
-def load_pca_transformation(path_to_dir, latent_dim, native_dim):
+def load_pca_transformation(path_to_dir, latent_dim, native_dim, unsquashed=True):
+
+    if unsquashed: suffix = "_unsquashed"
+    else: suffix = "_squashed"
 
     if latent_dim != -1:
-        W = np.load(f'{path_to_dir}/W.npy')
-        mu = np.load(f'{path_to_dir}/mu.npy')
+        W = np.load(f'{path_to_dir}/W{suffix}.npy')
+        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
     else:
         W = np.eye(native_dim)
         mu = np.zeros(native_dim)
