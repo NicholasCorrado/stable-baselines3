@@ -15,6 +15,7 @@ from stable_baselines3.common.torch_layers import (
     get_actor_critic_arch,
 )
 from stable_baselines3.common.type_aliases import Schedule
+from stable_baselines3.common.utils import load_pca_transformation
 
 
 class Actor(BasePolicy):
@@ -34,6 +35,7 @@ class Actor(BasePolicy):
 
     def __init__(
         self,
+        latent_dim: int,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         net_arch: List[int],
@@ -41,25 +43,26 @@ class Actor(BasePolicy):
         features_dim: int,
         activation_fn: Type[nn.Module] = nn.ReLU,
         normalize_images: bool = True,
-        squash_output: bool = False
     ):
-
-        print('actor', squash_output)
-
+        # We manually squash actions after applying PCA transformation
         super(Actor, self).__init__(
             observation_space,
             action_space,
             features_extractor=features_extractor,
             normalize_images=normalize_images,
-            squash_output=squash_output,
+            squash_output=False,
         )
 
         self.net_arch = net_arch
         self.features_dim = features_dim
         self.activation_fn = activation_fn
 
-        action_dim = get_action_dim(self.action_space)
-        actor_net = create_mlp(features_dim, action_dim, net_arch, activation_fn, squash_output=squash_output)
+        native_dim = get_action_dim(self.action_space)
+        actor_net = create_mlp(features_dim, latent_dim, net_arch, activation_fn, squash_output=False)
+        self.W_latent, self.mu_latent = load_pca_transformation(
+            path_to_dir='./pca/pca_results/unsquashed/Reacher20-v3',
+            latent_dim=latent_dim,
+            native_dim=native_dim)
         # Deterministic action
         self.mu = nn.Sequential(*actor_net)
 
@@ -79,7 +82,10 @@ class Actor(BasePolicy):
     def forward(self, obs: th.Tensor) -> th.Tensor:
         # assert deterministic, 'The TD3 actor only outputs deterministic actions'
         features = self.extract_features(obs)
-        return self.mu(features)
+        mu = self.mu(features)
+        mu = self.W_latent(mu) + self.mu_latent
+        mu = th.tanh(mu)
+        return mu
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # Note: the deterministic deterministic parameter is ignored in the case of TD3.
@@ -87,7 +93,7 @@ class Actor(BasePolicy):
         return self.forward(observation)
 
 
-class TD3Policy(BasePolicy):
+class TD3LatentPolicy(BasePolicy):
     """
     Policy class (with both actor and critic) for TD3.
 
@@ -124,17 +130,16 @@ class TD3Policy(BasePolicy):
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
         n_critics: int = 2,
         share_features_extractor: bool = True,
-        squash_output: bool = False,
+        latent_dim=-1
     ):
-        print('policy', squash_output)
-        super(TD3Policy, self).__init__(
+        super(TD3LatentPolicy, self).__init__(
             observation_space,
             action_space,
             features_extractor_class,
             features_extractor_kwargs,
             optimizer_class=optimizer_class,
             optimizer_kwargs=optimizer_kwargs,
-            squash_output=squash_output,
+            squash_output=True,
         )
 
         # Default network architecture, from the original paper
@@ -156,6 +161,7 @@ class TD3Policy(BasePolicy):
             "normalize_images": normalize_images,
         }
         self.actor_kwargs = self.net_args.copy()
+        self.actor_kwargs['latent_dim'] = latent_dim
         self.critic_kwargs = self.net_args.copy()
         self.critic_kwargs.update(
             {
@@ -248,10 +254,10 @@ class TD3Policy(BasePolicy):
         self.training = mode
 
 
-MlpPolicy = TD3Policy
+MlpPolicy = TD3LatentPolicy
 
 
-class CnnPolicy(TD3Policy):
+class CnnPolicy(TD3LatentPolicy):
     """
     Policy class (with both actor and critic) for TD3.
 
@@ -305,7 +311,7 @@ class CnnPolicy(TD3Policy):
         )
 
 
-class MultiInputPolicy(TD3Policy):
+class MultiInputPolicy(TD3LatentPolicy):
     """
     Policy class (with both actor and critic) for TD3 to be used with Dict observation spaces.
 
