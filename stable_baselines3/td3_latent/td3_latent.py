@@ -89,6 +89,8 @@ class TD3Latent(OffPolicyAlgorithm):
         _init_setup_model: bool = True,
     ):
 
+        policy_kwargs['env_id'] = env.envs[0].spec.id
+
         super(TD3Latent, self).__init__(
             policy,
             env,

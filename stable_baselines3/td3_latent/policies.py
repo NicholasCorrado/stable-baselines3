@@ -35,7 +35,8 @@ class Actor(BasePolicy):
 
     def __init__(
         self,
-        latent_dim: int,
+        latent_dim,
+        env_id,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         net_arch: List[int],
@@ -58,11 +59,15 @@ class Actor(BasePolicy):
         self.activation_fn = activation_fn
 
         native_dim = get_action_dim(self.action_space)
-        actor_net = create_mlp(features_dim, latent_dim, net_arch, activation_fn, squash_output=False)
         self.W_latent, self.mu_latent = load_pca_transformation(
-            path_to_dir='./pca/pca_results/unsquashed/Reacher20-v3',
+            path_to_dir=f'./pca/pca_results/{env_id}',
             latent_dim=latent_dim,
             native_dim=native_dim)
+        if latent_dim == -1:
+            latent_dim = native_dim
+
+
+        actor_net = create_mlp(features_dim, latent_dim, net_arch, activation_fn, squash_output=False)
         # Deterministic action
         self.mu = nn.Sequential(*actor_net)
 
@@ -118,6 +123,7 @@ class TD3LatentPolicy(BasePolicy):
 
     def __init__(
         self,
+        # ADDITIONAL ARGUMENTS NEED TO GO AT THE END, SINCE OffPolicyAlgorithm CALLS THE CONSTRUCTOR WITH POSITIONAL ARGUMENTS.
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         lr_schedule: Schedule,
@@ -130,7 +136,8 @@ class TD3LatentPolicy(BasePolicy):
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
         n_critics: int = 2,
         share_features_extractor: bool = True,
-        latent_dim=-1
+        latent_dim: Optional[int] = -1,
+        env_id: Optional[str] = None,
     ):
         super(TD3LatentPolicy, self).__init__(
             observation_space,
@@ -139,7 +146,7 @@ class TD3LatentPolicy(BasePolicy):
             features_extractor_kwargs,
             optimizer_class=optimizer_class,
             optimizer_kwargs=optimizer_kwargs,
-            squash_output=True,
+            squash_output=False,
         )
 
         # Default network architecture, from the original paper
@@ -162,6 +169,7 @@ class TD3LatentPolicy(BasePolicy):
         }
         self.actor_kwargs = self.net_args.copy()
         self.actor_kwargs['latent_dim'] = latent_dim
+        self.actor_kwargs['env_id'] = env_id
         self.critic_kwargs = self.net_args.copy()
         self.critic_kwargs.update(
             {
