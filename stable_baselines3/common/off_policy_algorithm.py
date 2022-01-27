@@ -4,6 +4,7 @@ import time
 import warnings
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from warnings import warn
 
 import gym
 import numpy as np
@@ -416,15 +417,22 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         # Rescale the action from [low, high] to [-1, 1]
         if isinstance(self.action_space, gym.spaces.Box):
-            scaled_action = self.policy.scale_action(unscaled_action)
+            if not np.any(self.action_space.bounded_above) or not np.any(self.action_space.bounded_below):
+                warn('Action space bounds contains +/-inf. Actions will not be scaled.')
+                action = unscaled_action
+                if action_noise is not None:
+                    action = np.clip(action + action_noise(), -1, 1)
+                buffer_action = action
+            else:
+                scaled_action = self.policy.scale_action(unscaled_action)
 
-            # Add noise to the action (improve exploration)
-            if action_noise is not None:
-                scaled_action = np.clip(scaled_action + action_noise(), -1, 1)
+                # Add noise to the action (improve exploration)
+                if action_noise is not None:
+                    scaled_action = np.clip(scaled_action + action_noise(), -1, 1)
 
-            # We store the scaled action in the buffer
-            buffer_action = scaled_action
-            action = self.policy.unscale_action(scaled_action)
+                # We store the scaled action in the buffer
+                buffer_action = scaled_action
+                action = self.policy.unscale_action(scaled_action)
         else:
             # Discrete case, no need to normalize or clip
             buffer_action = unscaled_action

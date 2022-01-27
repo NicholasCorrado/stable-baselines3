@@ -537,3 +537,21 @@ def load_pca_transformation(path_to_dir, latent_dim, native_dim, unsquashed=True
     W_latent.weight.requires_grad = False
 
     return W_latent.type(torch.float), mu_latent.type(torch.float)
+
+def load_pca_transformation_numpy(path_to_dir, latent_dim, native_dim, unsquashed=True):
+
+    assert type(latent_dim) == int
+    assert type(native_dim) == int
+
+    if unsquashed: suffix = "_unsquashed"
+    else: suffix = "_squashed"
+
+    if latent_dim != -1:
+        W = np.load(f'{path_to_dir}/W{suffix}.npy')
+        W = W[:latent_dim, :]
+        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
+    else:
+        W = np.eye(native_dim)
+        mu = np.zeros(native_dim)
+
+    return W, mu
