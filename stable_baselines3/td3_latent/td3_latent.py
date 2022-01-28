@@ -88,7 +88,6 @@ class TD3Latent(OffPolicyAlgorithm):
         _init_setup_model: bool = True,
     ):
 
-        assert not isinstance(action_noise, OrnsteinUhlenbeckActionNoise)
         env_id = env.envs[0].spec.id
         policy_kwargs['env_id'] = env_id
         policy_kwargs['action_noise'] = action_noise

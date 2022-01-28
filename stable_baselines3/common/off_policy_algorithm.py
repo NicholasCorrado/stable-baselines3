@@ -612,6 +612,10 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                     if action_noise is not None:
                         kwargs = dict(indices=[idx]) if env.num_envs > 1 else {}
                         action_noise.reset(**kwargs)
+                    try:
+                        self.actor.action_noise.reset()
+                    except:
+                        pass
 
                     # Log training infos
                     if log_interval is not None and self._episode_num % log_interval == 0:
