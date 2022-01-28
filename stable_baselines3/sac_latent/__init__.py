@@ -1,0 +1,2 @@
+from stable_baselines3.sac_latent.policies import MlpPolicy
+from stable_baselines3.sac_latent.sac_latent import SACLatent

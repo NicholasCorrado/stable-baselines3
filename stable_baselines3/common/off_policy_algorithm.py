@@ -4,7 +4,6 @@ import time
 import warnings
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
-from warnings import warn
 
 import gym
 import numpy as np
@@ -25,7 +24,6 @@ from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 class OffPolicyAlgorithm(BaseAlgorithm):
     """
     The base for Off-Policy algorithms (ex: SAC/TD3)
-
     :param policy: Policy object
     :param env: The environment to learn from
                 (if registered in Gym, can be str. Can be None for loading trained models)
@@ -235,7 +233,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
     def save_replay_buffer(self, path: Union[str, pathlib.Path, io.BufferedIOBase]) -> None:
         """
         Save the replay buffer as a pickle file.
-
         :param path: Path to the file where the replay buffer should be saved.
             if path is a str or pathlib.Path, the path is automatically created if necessary.
         """
@@ -249,7 +246,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
     ) -> None:
         """
         Load a replay buffer from a pickle file.
-
         :param path: Path to the pickled replay buffer.
         :param truncate_last_traj: When using ``HerReplayBuffer`` with online sampling:
             If set to ``True``, we assume that the last trajectory in the replay buffer was finished
@@ -395,7 +391,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         This is either done by sampling the probability distribution of the policy,
         or sampling a random action (from a uniform distribution over the action space)
         or by adding noise to the deterministic output.
-
         :param action_noise: Action noise that will be used for exploration
             Required for deterministic policy (e.g. TD3). This can also be used
             in addition to the stochastic policy for SAC.
@@ -417,22 +412,15 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         # Rescale the action from [low, high] to [-1, 1]
         if isinstance(self.action_space, gym.spaces.Box):
-            if not np.any(self.action_space.bounded_above) or not np.any(self.action_space.bounded_below):
-                warn('Action space bounds contains +/-inf. Actions will not be scaled.')
-                action = unscaled_action
-                if action_noise is not None:
-                    action = np.clip(action + action_noise(), -1, 1)
-                buffer_action = action
-            else:
-                scaled_action = self.policy.scale_action(unscaled_action)
+            scaled_action = self.policy.scale_action(unscaled_action)
 
-                # Add noise to the action (improve exploration)
-                if action_noise is not None:
-                    scaled_action = np.clip(scaled_action + action_noise(), -1, 1)
+            # Add noise to the action (improve exploration)
+            if action_noise is not None:
+                scaled_action = np.clip(scaled_action + action_noise(), -1, 1)
 
-                # We store the scaled action in the buffer
-                buffer_action = scaled_action
-                action = self.policy.unscale_action(scaled_action)
+            # We store the scaled action in the buffer
+            buffer_action = scaled_action
+            action = self.policy.unscale_action(scaled_action)
         else:
             # Discrete case, no need to normalize or clip
             buffer_action = unscaled_action
@@ -481,7 +469,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         Store transition in the replay buffer.
         We store the normalized action and the unnormalized observation.
         It also handles terminal observations (because VecEnv resets automatically).
-
         :param replay_buffer: Replay buffer object where to store the transition.
         :param buffer_action: normalized action
         :param new_obs: next observation in the current episode
@@ -545,7 +532,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
     ) -> RolloutReturn:
         """
         Collect experiences and store them into a ``ReplayBuffer``.
-
         :param env: The training environment
         :param callback: Callback that will be called at each step
             (and at the beginning and end of the rollout)
