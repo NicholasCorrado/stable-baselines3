@@ -95,7 +95,9 @@ class Actor(BasePolicy):
         features = self.extract_features(obs)
         mu = self.mu(features)
         if not deterministic:
-            mu += th.from_numpy(self.action_noise()[:self.latent_dim])
+            noise = self.action_noise()
+            print(noise)
+            mu += th.from_numpy(noise[:self.latent_dim])
         mu = self.decoder(mu)
         mu = th.tanh(mu)
         return mu
