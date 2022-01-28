@@ -6,7 +6,7 @@ import torch as th
 from torch.nn import functional as F
 
 from stable_baselines3.common.buffers import ReplayBuffer
-from stable_baselines3.common.noise import ActionNoise
+from stable_baselines3.common.noise import ActionNoise, OrnsteinUhlenbeckActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import polyak_update
@@ -88,8 +88,10 @@ class TD3Latent(OffPolicyAlgorithm):
         _init_setup_model: bool = True,
     ):
 
+        assert not isinstance(action_noise, OrnsteinUhlenbeckActionNoise)
         env_id = env.envs[0].spec.id
         policy_kwargs['env_id'] = env_id
+        policy_kwargs['action_noise'] = action_noise
 
         super(TD3Latent, self).__init__(
             policy,
@@ -103,7 +105,7 @@ class TD3Latent(OffPolicyAlgorithm):
             gamma,
             train_freq,
             gradient_steps,
-            action_noise=action_noise,
+            action_noise=None,
             replay_buffer_class=replay_buffer_class,
             replay_buffer_kwargs=replay_buffer_kwargs,
             policy_kwargs=policy_kwargs,
@@ -154,7 +156,7 @@ class TD3Latent(OffPolicyAlgorithm):
                 # Select action according to policy and add clipped noise
                 noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
                 noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                next_actions = (self.actor_target(replay_data.next_observations) + noise).clamp(-1, 1)
+                next_actions = th.tanh(th.atanh(self.actor_target(replay_data.next_observations)) + noise)
 
                 # Compute the next Q-values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)

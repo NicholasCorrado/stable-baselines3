@@ -37,6 +37,7 @@ class Actor(BasePolicy):
         self,
         latent_dim,
         env_id,
+        action_noise,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         net_arch: List[int],
@@ -57,18 +58,24 @@ class Actor(BasePolicy):
         self.net_arch = net_arch
         self.features_dim = features_dim
         self.activation_fn = activation_fn
-        print(latent_dim)
-        native_dim = get_action_dim(self.action_space)
-        self.W_latent = get_pca_layer(
-            path_to_dir=f'./pca/pca_results/{env_id}',
-            latent_dim=latent_dim)
-        if latent_dim == -1:
-            latent_dim = native_dim
+
+        self.env_id = env_id
+        self.use_latent = latent_dim != -1
+        print(f'latent_dim = {latent_dim}')
+
+        self.native_dim = get_action_dim(self.action_space)
+        self.latent_dim = latent_dim if self.use_latent else self.native_dim
+        self.decoder = get_pca_layer(
+            path_to_dir=f'./pca/pca_results/{self.env_id}',
+            latent_dim=self.latent_dim)
 
 
-        actor_net = create_mlp(features_dim, latent_dim, net_arch, activation_fn, squash_output=False)
+
+        actor_net = create_mlp(features_dim, self.latent_dim, net_arch, activation_fn, squash_output=False)
         # Deterministic action
         self.mu = nn.Sequential(*actor_net)
+
+        self.action_noise = action_noise
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()
@@ -83,18 +90,20 @@ class Actor(BasePolicy):
         )
         return data
 
-    def forward(self, obs: th.Tensor) -> th.Tensor:
+    def forward(self, obs: th.Tensor, deterministic=False) -> th.Tensor:
         # assert deterministic, 'The TD3 actor only outputs deterministic actions'
         features = self.extract_features(obs)
         mu = self.mu(features)
-        mu = self.W_latent(mu) + self.mu_latent
+        if not deterministic:
+            mu += th.from_numpy(self.action_noise()[:self.latent_dim])
+        mu = self.decoder(mu)
         mu = th.tanh(mu)
         return mu
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # Note: the deterministic deterministic parameter is ignored in the case of TD3.
         #   Predictions are always deterministic.
-        return self.forward(observation)
+        return self.forward(observation, deterministic)
 
 
 class TD3LatentPolicy(BasePolicy):
@@ -137,6 +146,7 @@ class TD3LatentPolicy(BasePolicy):
         share_features_extractor: bool = True,
         latent_dim: Optional[int] = -1,
         env_id: Optional[str] = None,
+        action_noise = None,
     ):
         super(TD3LatentPolicy, self).__init__(
             observation_space,
@@ -169,6 +179,8 @@ class TD3LatentPolicy(BasePolicy):
         self.actor_kwargs = self.net_args.copy()
         self.actor_kwargs['latent_dim'] = latent_dim
         self.actor_kwargs['env_id'] = env_id
+        self.actor_kwargs['action_noise'] = action_noise
+
         self.critic_kwargs = self.net_args.copy()
         self.critic_kwargs.update(
             {
@@ -246,7 +258,7 @@ class TD3LatentPolicy(BasePolicy):
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # Note: the deterministic deterministic parameter is ignored in the case of TD3.
         #   Predictions are always deterministic.
-        return self.actor(observation)
+        return self.actor(observation, deterministic)
 
     def set_training_mode(self, mode: bool) -> None:
         """
