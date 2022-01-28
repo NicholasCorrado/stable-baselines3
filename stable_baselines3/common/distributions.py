@@ -10,6 +10,7 @@ from torch import nn
 from torch.distributions import Bernoulli, Categorical, Normal
 
 from stable_baselines3.common.preprocessing import get_action_dim
+from stable_baselines3.common.utils import get_pca_layer
 
 
 class Distribution(ABC):
@@ -200,11 +201,12 @@ class SquashedDiagGaussianDistribution(DiagGaussianDistribution):
     :param epsilon: small value to avoid NaN due to numerical imprecision.
     """
 
-    def __init__(self, action_dim: int, epsilon: float = 1e-6):
+    def __init__(self, action_dim: int, decoder: Optional[th.nn.Module] = None,  epsilon: float = 1e-6):
         super(SquashedDiagGaussianDistribution, self).__init__(action_dim)
         # Avoid NaN (prevents division by zero or log of zero)
         self.epsilon = epsilon
         self.gaussian_actions = None
+        self.decoder = decoder
 
     def proba_distribution(self, mean_actions: th.Tensor, log_std: th.Tensor) -> "SquashedDiagGaussianDistribution":
         super(SquashedDiagGaussianDistribution, self).proba_distribution(mean_actions, log_std)
@@ -233,17 +235,34 @@ class SquashedDiagGaussianDistribution(DiagGaussianDistribution):
     def sample(self) -> th.Tensor:
         # Reparametrization trick to pass gradients
         self.gaussian_actions = super().sample()
+        if self.decoder is not None:
+            self.gaussian_actions = self.decoder(self.gaussian_actions)
         return th.tanh(self.gaussian_actions)
 
     def mode(self) -> th.Tensor:
         self.gaussian_actions = super().mode()
-        # Squash the output
+        if self.decoder is not None:
+            self.gaussian_actions = self.decoder(self.gaussian_actions)
         return th.tanh(self.gaussian_actions)
 
     def log_prob_from_params(self, mean_actions: th.Tensor, log_std: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
-        action = self.actions_from_params(mean_actions, log_std)
-        log_prob = self.log_prob(action, self.gaussian_actions)
-        return action, log_prob
+
+        if self.decoder is None:
+            action = self.actions_from_params(mean_actions, log_std)
+            log_prob = self.log_prob(action, self.gaussian_actions)
+            return action, log_prob
+        else:
+            # action = self.actions_from_params(mean_actions, log_std)
+            # Compute log probs using the latent actions but return the native actions.
+            self.proba_distribution(mean_actions, log_std)
+            self.gaussian_actions = super().sample()
+            action = th.tanh(self.gaussian_actions)
+            log_prob = self.log_prob(action, self.gaussian_actions)
+
+            native_action = self.decoder(self.gaussian_actions)
+            native_action = th.tanh(native_action)
+
+            return native_action, log_prob
 
 
 class CategoricalDistribution(Distribution):
@@ -427,6 +446,7 @@ class StateDependentNoiseDistribution(Distribution):
     def __init__(
         self,
         action_dim: int,
+        decoder: th.nn.Module,
         full_std: bool = True,
         use_expln: bool = False,
         squash_output: bool = False,
@@ -446,6 +466,7 @@ class StateDependentNoiseDistribution(Distribution):
         self.full_std = full_std
         self.epsilon = epsilon
         self.learn_features = learn_features
+        self.decoder = decoder
         if squash_output:
             self.bijector = TanhBijector(epsilon)
         else:
@@ -560,12 +581,16 @@ class StateDependentNoiseDistribution(Distribution):
     def sample(self) -> th.Tensor:
         noise = self.get_noise(self._latent_sde)
         actions = self.distribution.mean + noise
+        if self.decoder is not None:
+            actions = self.decoder(actions)
         if self.bijector is not None:
             return self.bijector.forward(actions)
         return actions
 
     def mode(self) -> th.Tensor:
         actions = self.distribution.mean
+        if self.decoder is not None:
+            actions = self.decoder(actions)
         if self.bijector is not None:
             return self.bijector.forward(actions)
         return actions
@@ -592,10 +617,19 @@ class StateDependentNoiseDistribution(Distribution):
     def log_prob_from_params(
         self, mean_actions: th.Tensor, log_std: th.Tensor, latent_sde: th.Tensor
     ) -> Tuple[th.Tensor, th.Tensor]:
-        actions = self.actions_from_params(mean_actions, log_std, latent_sde)
-        log_prob = self.log_prob(actions)
-        return actions, log_prob
-
+        if self.decoder is None:
+            actions = self.actions_from_params(mean_actions, log_std, latent_sde)
+            log_prob = self.log_prob(actions)
+            return actions, log_prob
+        else:
+            # Compute log probs using latent actions but return native actions
+            self.proba_distribution(mean_actions, log_std, latent_sde)
+            noise = self.get_noise(self._latent_sde)
+            latent_actions = self.distribution.mean + noise
+            latent_actions = self.bijector.forward(latent_actions)
+            log_prob = self.log_prob(latent_actions)
+            native_actions = th.tanh(self.decoder(latent_actions))
+            return native_actions, log_prob
 
 class TanhBijector(object):
     """

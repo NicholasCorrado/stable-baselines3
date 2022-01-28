@@ -506,7 +506,35 @@ def get_system_info(print_info: bool = True) -> Tuple[Dict[str, str], str]:
         print(env_info_str)
     return env_info, env_info_str
 
-def load_pca_transformation(path_to_dir, latent_dim, native_dim, unsquashed=True):
+def get_pca_layer(path_to_dir, latent_dim, unsquashed=True):
+
+    assert latent_dim is not None
+
+    if unsquashed: suffix = "_unsquashed"
+    else: suffix = "_squashed"
+
+    W = np.load(f'{path_to_dir}/W{suffix}.npy')
+    W = W[:latent_dim, :].T
+    mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
+
+    native_dim = mu.shape[0]
+    decoder = nn.Linear(latent_dim, native_dim)
+
+    W = torch.from_numpy(W)
+    if W.shape[0] == 1:
+        W = W.unsqueeze(0)
+    with torch.no_grad():
+        decoder.weight = torch.nn.Parameter(W)
+
+    mu_latent = torch.from_numpy(mu)
+    decoder.bias = torch.nn.Parameter(mu_latent)
+
+    decoder.requires_grad_(False)
+    decoder.type(torch.float)
+
+    return decoder
+
+def load_pca_transformation_numpy(path_to_dir, latent_dim, native_dim, unsquashed=True):
 
     assert type(latent_dim) == int
     assert type(native_dim) == int
@@ -516,24 +544,10 @@ def load_pca_transformation(path_to_dir, latent_dim, native_dim, unsquashed=True
 
     if latent_dim != -1:
         W = np.load(f'{path_to_dir}/W{suffix}.npy')
+        W = W[:latent_dim, :].T
         mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
     else:
-        latent_dim = native_dim
         W = np.eye(native_dim)
         mu = np.zeros(native_dim)
 
-    native_dim = W.shape[0]
-    W_latent = nn.Linear(latent_dim, native_dim, bias=False)
-
-    mu_latent = torch.from_numpy(mu)
-    mu_latent.requires_grad = False
-
-    W = W[:latent_dim, :]
-    W = torch.from_numpy(W.T).type(torch.float)
-    if W.shape[0] == 1:
-        W = W.unsqueeze(0)
-    with torch.no_grad():
-        W_latent.weight = torch.nn.Parameter(W)
-    W_latent.weight.requires_grad = False
-
-    return W_latent.type(torch.float), mu_latent.type(torch.float)
+    return W, mu

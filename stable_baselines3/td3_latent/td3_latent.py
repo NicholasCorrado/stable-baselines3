@@ -10,7 +10,6 @@ from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import polyak_update
-from stable_baselines3.td3.policies import TD3Policy
 from stable_baselines3.td3_latent.policies import TD3LatentPolicy
 
 
@@ -89,7 +88,8 @@ class TD3Latent(OffPolicyAlgorithm):
         _init_setup_model: bool = True,
     ):
 
-        policy_kwargs['env_id'] = env.envs[0].spec.id
+        env_id = env.envs[0].spec.id
+        policy_kwargs['env_id'] = env_id
 
         super(TD3Latent, self).__init__(
             policy,

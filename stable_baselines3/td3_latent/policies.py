@@ -15,7 +15,7 @@ from stable_baselines3.common.torch_layers import (
     get_actor_critic_arch,
 )
 from stable_baselines3.common.type_aliases import Schedule
-from stable_baselines3.common.utils import load_pca_transformation
+from stable_baselines3.common.utils import get_pca_layer
 
 
 class Actor(BasePolicy):
@@ -57,12 +57,11 @@ class Actor(BasePolicy):
         self.net_arch = net_arch
         self.features_dim = features_dim
         self.activation_fn = activation_fn
-
+        print(latent_dim)
         native_dim = get_action_dim(self.action_space)
-        self.W_latent, self.mu_latent = load_pca_transformation(
+        self.W_latent = get_pca_layer(
             path_to_dir=f'./pca/pca_results/{env_id}',
-            latent_dim=latent_dim,
-            native_dim=native_dim)
+            latent_dim=latent_dim)
         if latent_dim == -1:
             latent_dim = native_dim
 

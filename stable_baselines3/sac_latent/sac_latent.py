@@ -10,7 +10,7 @@ from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import polyak_update
-from algs.sac_latent_policy import SACPolicyLatent
+from stable_baselines3.sac_latent.policies import SACPolicyLatent
 
 """
 Same as SAC but uses SACPolicyLatent instead of SACPolicy
@@ -105,6 +105,8 @@ class SACLatent(OffPolicyAlgorithm):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
     ):
+
+        policy_kwargs['env_id'] = env.envs[0].spec.id
 
         super(SACLatent, self).__init__(
             policy,

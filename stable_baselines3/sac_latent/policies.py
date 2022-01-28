@@ -7,8 +7,9 @@ import torch
 import torch as th
 from torch import nn
 
-from stable_baselines3.common.distributions import SquashedDiagGaussianDistribution, TanhBijector
-from algs.state_dependent_noise_dist import StateDependentNoiseDistribution
+from stable_baselines3.common.distributions import SquashedDiagGaussianDistribution, TanhBijector, \
+    StateDependentNoiseDistribution
+# from algs.state_dependent_noise_dist import StateDependentNoiseDistribution
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic, register_policy
 from stable_baselines3.common.preprocessing import get_action_dim
 from stable_baselines3.common.torch_layers import (
@@ -22,6 +23,8 @@ from stable_baselines3.common.torch_layers import (
 from stable_baselines3.common.type_aliases import Schedule
 
 # CAP the standard deviation of the actor
+from stable_baselines3.common.utils import get_pca_layer
+
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
 
@@ -54,8 +57,6 @@ class ActorLatent(BasePolicy):
 
     def __init__(
         self,
-        latent_dim,
-        env_id,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         net_arch: List[int],
@@ -69,6 +70,8 @@ class ActorLatent(BasePolicy):
         use_expln: bool = False,
         clip_mean: float = 2.0,
         normalize_images: bool = True,
+        latent_dim: int = -1,
+        env_id: str = None,
     ):
         super(ActorLatent, self).__init__(
             observation_space,
@@ -100,8 +103,12 @@ class ActorLatent(BasePolicy):
         # @latent: env needs to keep the native dim, otherwise we get erros with replay buffer. So, we modify action dim here.
         self.native_dim = get_action_dim(self.action_space)
         self.latent_dim = latent_dim if self.use_latent else self.native_dim
-        # assert self.latent_dim >= 1 and self.latent_dim <= self.native_dim
 
+        self.decoder = None
+        if self.use_latent:
+            self.decoder = get_pca_layer(
+                path_to_dir=f'./pca/pca_results/{env_id}',
+                latent_dim=self.latent_dim)
 
         latent_pi_net = create_mlp(features_dim, -1, net_arch, activation_fn)
         self.latent_pi = nn.Sequential(*latent_pi_net)
@@ -110,46 +117,19 @@ class ActorLatent(BasePolicy):
         if self.use_sde:
             # @latent: use_expln=True, since we often get NaNs
             self.action_dist = StateDependentNoiseDistribution(
-                latent_action_dim=self.latent_dim, native_action_dim=self.native_dim, full_std=full_std, use_expln=True, learn_features=True, squash_output=True
+                action_dim=self.latent_dim, decoder=self.decoder, full_std=full_std, use_expln=True, learn_features=True, squash_output=True
             )
             self.mu, self.log_std = self.action_dist.proba_distribution_net(
                 latent_dim=last_layer_dim, latent_sde_dim=last_layer_dim, log_std_init=log_std_init
             )
             # Avoid numerical issues by limiting the mean of the Gaussian
             # to be in [-clip_mean, clip_mean]
-            # if clip_mean > 0.0:
-                # @latent: clipping should be done after W transformation to avoid numerical instabilities
-                # self.mu = nn.Sequential(self.mu, nn.Hardtanh(min_val=-clip_mean, max_val=clip_mean))
+            if clip_mean > 0.0:
+                self.mu = nn.Sequential(self.mu, nn.Hardtanh(min_val=-clip_mean, max_val=clip_mean))
         else:
-            self.action_dist = SquashedDiagGaussianDistribution(self.native_dim)
+            self.action_dist = SquashedDiagGaussianDistribution(self.latent_dim, self.decoder)
             self.mu = nn.Linear(last_layer_dim, self.latent_dim)
-            self.log_std = nn.Linear(last_layer_dim, self.native_dim)
-
-        # @latent
-        self.W = nn.Linear(self.latent_dim, self.native_dim, bias=False)
-
-        if self.use_latent:
-            W = np.load(f'./pca/pca_results/unsquashed/{env_id}/W.npy')
-            W = W[:self.latent_dim,:]
-            mu_latent = np.load(f'./pca/pca_results/unsquashed/{env_id}/mu.npy')
-
-        else:
-            W = np.eye(self.native_dim)
-            mu_latent = np.zeros(self.native_dim)
-
-
-        self.mu_latent = torch.from_numpy(mu_latent)
-        self.mu_latent.requires_grad = False
-
-        W = torch.from_numpy(W.T).type(torch.float)
-        if W.shape[0] == 1:
-            W = W.unsqueeze(0)
-        with torch.no_grad():
-            self.W.weight = torch.nn.Parameter(W)
-        self.W.weight.requires_grad = False
-
-        self.clip_mean_hardtanh = nn.Hardtanh(min_val=-self.clip_mean, max_val=self.clip_mean)
-        # self.abs_det_W = torch.abs(torch.det(W))
+            self.log_std = nn.Linear(last_layer_dim, self.latent_dim)
 
 
 
@@ -206,10 +186,6 @@ class ActorLatent(BasePolicy):
         features = self.extract_features(obs)
         latent_pi = self.latent_pi(features)
         mean_actions = self.mu(latent_pi)
-        mean_actions = self.W(mean_actions)
-        mean_actions += self.mu_latent
-        if self.clip_mean > 0:
-            mean_actions = self.clip_mean_hardtanh(mean_actions)
 
         if self.use_sde:
             return mean_actions, self.log_std, dict(latent_sde=latent_pi)
@@ -284,8 +260,8 @@ class SACPolicyLatent(BasePolicy):
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
         n_critics: int = 2,
         share_features_extractor: bool = True,
-        latent_dim: Optional[int] = None,
-        env_id: Optional[str] = None
+        latent_dim: int = -1,
+        env_id: str = None
     ):
         super(SACPolicyLatent, self).__init__(
             observation_space,
@@ -326,10 +302,8 @@ class SACPolicyLatent(BasePolicy):
             "clip_mean": clip_mean,
         }
         self.actor_kwargs.update(sde_kwargs)
-
-        latent_kwargs = {'latent_dim': latent_dim,
-                         'env_id': env_id}
-        self.actor_kwargs.update(latent_kwargs)
+        self.actor_kwargs['latent_dim'] = latent_dim
+        self.actor_kwargs['env_id'] = env_id
         self.critic_kwargs = self.net_args.copy()
         self.critic_kwargs.update(
             {
