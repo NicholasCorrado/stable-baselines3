@@ -9,8 +9,7 @@ from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
-from stable_baselines3.common.utils import polyak_update, load_pca_transformation_numpy
-from stable_baselines3.td3.policies import TD3Policy
+from stable_baselines3.common.utils import polyak_update
 from stable_baselines3.td3_latent.policies import TD3LatentPolicy
 
 
@@ -91,14 +90,6 @@ class TD3Latent(OffPolicyAlgorithm):
 
         env_id = env.envs[0].spec.id
         policy_kwargs['env_id'] = env_id
-        self.native_dim = env.action_space.shape[0]
-        try:
-            self.latent_dim = policy_kwargs['latent_dim']
-        except:
-            self.latent_dim = self.native_dim
-        if self.latent_dim == -1: self.latent_dim = self.native_dim
-        self.W_latent, self.mu_latent = load_pca_transformation_numpy(f'pca/pca_results/{env_id}', self.latent_dim, self.native_dim, unsquashed=False)
-        # self.mu_latent = self.mu_latent[:, np.newaxis]
 
         super(TD3Latent, self).__init__(
             policy,
@@ -161,9 +152,8 @@ class TD3Latent(OffPolicyAlgorithm):
 
             with th.no_grad():
                 # Select action according to policy and add clipped noise
-                noise = replay_data.actions[:,:self.latent_dim].clone().data.normal_(0, self.target_policy_noise)
+                noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
                 noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                noise = self.W_latent.T.dot(noise.T).T
                 next_actions = (self.actor_target(replay_data.next_observations) + noise).clamp(-1, 1)
 
                 # Compute the next Q-values: min over all critics targets
