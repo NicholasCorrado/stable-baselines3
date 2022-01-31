@@ -21,7 +21,6 @@ from stable_baselines3.common.utils import get_pca_layer
 class Actor(BasePolicy):
     """
     Actor network (policy) for TD3.
-
     :param observation_space: Obervation space
     :param action_space: Action space
     :param net_arch: Network architecture
@@ -109,7 +108,6 @@ class Actor(BasePolicy):
 class TD3LatentPolicy(BasePolicy):
     """
     Policy class (with both actor and critic) for TD3.
-
     :param observation_space: Observation space
     :param action_space: Action space
     :param lr_schedule: Learning rate schedule (could be constant)
@@ -263,9 +261,7 @@ class TD3LatentPolicy(BasePolicy):
     def set_training_mode(self, mode: bool) -> None:
         """
         Put the policy in either training or evaluation mode.
-
         This affects certain modules, such as batch normalisation and dropout.
-
         :param mode: if true, set to training mode, else set to evaluation mode
         """
         self.actor.set_training_mode(mode)
@@ -279,7 +275,6 @@ MlpPolicy = TD3LatentPolicy
 class CnnPolicy(TD3LatentPolicy):
     """
     Policy class (with both actor and critic) for TD3.
-
     :param observation_space: Observation space
     :param action_space: Action space
     :param lr_schedule: Learning rate schedule (could be constant)
@@ -333,7 +328,6 @@ class CnnPolicy(TD3LatentPolicy):
 class MultiInputPolicy(TD3LatentPolicy):
     """
     Policy class (with both actor and critic) for TD3 to be used with Dict observation spaces.
-
     :param observation_space: Observation space
     :param action_space: Action space
     :param lr_schedule: Learning rate schedule (could be constant)

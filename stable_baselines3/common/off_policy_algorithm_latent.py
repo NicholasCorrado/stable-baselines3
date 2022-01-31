@@ -17,7 +17,8 @@ from stable_baselines3.common.noise import ActionNoise, VectorizedActionNoise
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.save_util import load_from_pkl, save_to_pkl
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, RolloutReturn, Schedule, TrainFreq, TrainFrequencyUnit
-from stable_baselines3.common.utils import safe_mean, should_collect_more_steps
+from stable_baselines3.common.utils import safe_mean, should_collect_more_steps, load_pca_transformation_numpy, \
+    get_pca_layer
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 
@@ -152,6 +153,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             self.policy_kwargs["use_sde"] = self.use_sde
         # For gSDE only
         self.use_sde_at_warmup = use_sde_at_warmup
+
+        self.W, self.mu = load_pca_transformation_numpy('./pca/pca_results/Reacher10-v3', latent_dim=2, native_dim=10)
+        self.P = self.W.dot(self.W.T)
 
     def _convert_train_freq(self) -> None:
         """
@@ -405,6 +409,11 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         if self.num_timesteps < learning_starts and not (self.use_sde and self.use_sde_at_warmup):
             # Warmup phase
             unscaled_action = np.array([self.action_space.sample() for _ in range(n_envs)])
+            with th.no_grad():
+                unscaled_action = np.array([np.random.normal(0,1,size=(self.actor.latent_dim,)) for _ in range(n_envs)])
+                unscaled_action = th.from_numpy(unscaled_action).type(th.float)
+                unscaled_action = self.actor.decoder(unscaled_action)
+                unscaled_action = unscaled_action.detach().numpy()
         else:
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
@@ -418,7 +427,13 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # Add noise to the action (improve exploration)
             if action_noise is not None:
                 scaled_action = np.clip(scaled_action + action_noise(), -1, 1)
-
+                # eps = 1e-7
+                # scaled_action = np.clip(scaled_action + action_noise(), -1+eps, 1-eps)
+                # # before = copy.deepcopy(scaled_action)
+                # scaled_action = np.arctanh(scaled_action)
+                # scaled_action = self.P.dot(scaled_action.reshape(-1) - self.mu) + self.mu
+                # scaled_action = np.tanh(scaled_action)
+                # scaled_action = scaled_action.reshape(1, -1)
             # We store the scaled action in the buffer
             buffer_action = scaled_action
             action = self.policy.unscale_action(scaled_action)
