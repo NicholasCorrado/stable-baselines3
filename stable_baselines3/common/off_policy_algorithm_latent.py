@@ -410,9 +410,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # Warmup phase
             unscaled_action = np.array([self.action_space.sample() for _ in range(n_envs)])
             with th.no_grad():
-                unscaled_action = np.array([np.random.normal(0,1,size=(self.actor.latent_dim,)) for _ in range(n_envs)])
+                unscaled_action = np.array([np.random.uniform(-1,1,size=(self.actor.latent_dim,)) for _ in range(n_envs)])
                 unscaled_action = th.from_numpy(unscaled_action).type(th.float)
-                unscaled_action = self.actor.decoder(unscaled_action)
+                unscaled_action = self.actor.decoder(unscaled_action) - self.actor.decoder.bias
                 unscaled_action = unscaled_action.detach().numpy()
         else:
             # Note: when using continuous actions,
@@ -426,7 +426,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
             # Add noise to the action (improve exploration)
             if action_noise is not None:
-                scaled_action = np.clip(scaled_action + action_noise(), -1, 1)
+                scaled_action = np.clip(scaled_action, -1, 1)
                 # eps = 1e-7
                 # scaled_action = np.clip(scaled_action + action_noise(), -1+eps, 1-eps)
                 # # before = copy.deepcopy(scaled_action)
