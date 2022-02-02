@@ -154,9 +154,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         # For gSDE only
         self.use_sde_at_warmup = use_sde_at_warmup
 
-        self.W, self.mu = load_pca_transformation_numpy('./pca/pca_results/Reacher10-v3', latent_dim=2, native_dim=10)
-        self.P = self.W.dot(self.W.T)
-
     def _convert_train_freq(self) -> None:
         """
         Convert `train_freq` parameter (int or tuple)
@@ -234,6 +231,10 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         # Convert train freq parameter to TrainFreq object
         self._convert_train_freq()
+
+        env_id = self.env.envs[0].spec.id
+        self.W, self.mu = load_pca_transformation_numpy(f'./pca/pca_results/{env_id}', latent_dim=self.policy.actor.latent_dim, native_dim=self.policy.actor.native_dim)
+        self.P = self.W.dot(self.W.T)
 
     def save_replay_buffer(self, path: Union[str, pathlib.Path, io.BufferedIOBase]) -> None:
         """
@@ -409,11 +410,11 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         if self.num_timesteps < learning_starts and not (self.use_sde and self.use_sde_at_warmup):
             # Warmup phase
             unscaled_action = np.array([self.action_space.sample() for _ in range(n_envs)])
-            with th.no_grad():
-                unscaled_action = np.array([np.random.uniform(-1,1,size=(self.actor.latent_dim,)) for _ in range(n_envs)])
-                unscaled_action = th.from_numpy(unscaled_action).type(th.float)
-                unscaled_action = self.actor.decoder(unscaled_action) - self.actor.decoder.bias
-                unscaled_action = unscaled_action.detach().numpy()
+            # NOTE: apparently it's very difficult to sample uniformly from an affine subspace without rejection
+            # sampling, and rejection sampling is horrendously inefficient when we decrease the dimensionality a lot.
+            # unscaled_action = self.action_space.sample()
+            # projected_action = self.P.dot(unscaled_action-self.mu) # P or P.T? Doesnt't matter since P is symmetric
+            # projected_action += self.mu
         else:
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action

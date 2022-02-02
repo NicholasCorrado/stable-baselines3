@@ -343,10 +343,10 @@ class BasePolicy(BaseModel):
             if self.squash_output:
                 # Rescale to proper domain when using squashing
                 actions = self.unscale_action(actions)
-            else:
-                # Actions could be on arbitrary scale, so clip the actions to avoid
-                # out of bound error (e.g. if sampling from a Gaussian distribution)
-                actions = np.clip(actions, self.action_space.low, self.action_space.high)
+            # else:
+            #     # Actions could be on arbitrary scale, so clip the actions to avoid
+            #     # out of bound error (e.g. if sampling from a Gaussian distribution)
+            #     actions = np.clip(actions, self.action_space.low, self.action_space.high)
 
         # Remove batch dimension if needed
         if not vectorized_env:
