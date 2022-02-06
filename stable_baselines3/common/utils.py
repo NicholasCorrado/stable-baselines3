@@ -507,16 +507,20 @@ def get_system_info(print_info: bool = True) -> Tuple[Dict[str, str], str]:
         print(env_info_str)
     return env_info, env_info_str
 
-def get_pca_layer(path_to_dir, latent_dim, unsquashed=True):
+def get_pca_layer(path_to_dir, latent_dim, native_dim, unsquashed=True):
 
     assert latent_dim is not None
 
     if unsquashed: suffix = "_unsquashed"
     else: suffix = "_squashed"
 
-    W = np.load(f'{path_to_dir}/W{suffix}.npy')
-    W = W[:latent_dim, :].T
-    mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
+    try:
+        W = np.load(f'{path_to_dir}/W{suffix}.npy')
+        W = W[:latent_dim, :].T
+        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
+    except:
+        W = np.eye(native_dim)
+        mu = np.zeros(native_dim)
 
     native_dim = mu.shape[0]
     decoder = nn.Linear(latent_dim, native_dim)

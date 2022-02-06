@@ -66,7 +66,7 @@ class Actor(BasePolicy):
         self.latent_dim = latent_dim if self.use_latent else self.native_dim
         self.decoder = get_pca_layer(
             path_to_dir=f'./pca/pca_results/{self.env_id}',
-            latent_dim=self.latent_dim)
+            latent_dim=self.latent_dim, native_dim=self.native_dim)
 
 
 
