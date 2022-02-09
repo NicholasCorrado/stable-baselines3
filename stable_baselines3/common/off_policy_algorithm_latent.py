@@ -413,8 +413,10 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # NOTE: apparently it's very difficult to sample uniformly from an affine subspace without rejection
             # sampling, and rejection sampling is horrendously inefficient when we decrease the dimensionality a lot.
             unscaled_action = self.action_space.sample()
-            projected_action = self.P.dot(unscaled_action-self.mu) # P or P.T? Doesnt't matter since P is symmetric
-            projected_action += self.mu
+            projected_action = np.arctanh(unscaled_action)
+            projected_action = self.P.dot(projected_action-self.mu) + self.mu # P or P.T? Doesnt't matter since P is symmetric
+            projected_action = np.tanh(projected_action)
+            unscaled_action = projected_action
         else:
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
@@ -629,10 +631,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                     if action_noise is not None:
                         kwargs = dict(indices=[idx]) if env.num_envs > 1 else {}
                         action_noise.reset(**kwargs)
-                    try:
-                        self.actor.action_noise.reset()
-                    except:
-                        pass
 
                     # Log training infos
                     if log_interval is not None and self._episode_num % log_interval == 0:

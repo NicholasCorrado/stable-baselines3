@@ -51,7 +51,7 @@ class Actor(BasePolicy):
             action_space,
             features_extractor=features_extractor,
             normalize_images=normalize_images,
-            squash_output=False,
+            squash_output=True,
         )
 
         self.net_arch = net_arch
@@ -95,7 +95,8 @@ class Actor(BasePolicy):
         mu = self.mu(features)
         if not deterministic:
             mu += th.from_numpy(self.action_noise()[:self.latent_dim])
-        mu = self.decoder(mu)
+        if self.use_latent:
+            mu = self.decoder(mu)
         mu = th.tanh(mu)
         return mu
 

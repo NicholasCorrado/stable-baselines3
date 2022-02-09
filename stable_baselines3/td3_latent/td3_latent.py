@@ -10,7 +10,7 @@ from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.noise import ActionNoise, OrnsteinUhlenbeckActionNoise
 from stable_baselines3.common.off_policy_algorithm_latent import OffPolicyAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
-from stable_baselines3.common.utils import polyak_update
+from stable_baselines3.common.utils import polyak_update, get_pca_layer
 from stable_baselines3.td3_latent.policies import TD3LatentPolicy
 
 
@@ -92,10 +92,10 @@ class TD3Latent(OffPolicyAlgorithm):
         env_id = env.envs[0].spec.id
         policy_kwargs['env_id'] = env_id
         policy_kwargs['action_noise'] = action_noise
-        # decoder = get_pca_layer('./pca/pca_results/Reacher10-v3', latent_dim=2)
-        # W = decoder.weight.data.type(th.double)
-        # self.mu = decoder.bias.data.unsqueeze(-1).type(th.double)
-        # self.Phere = W @ W.T
+        decoder = get_pca_layer(f'./pca/pca_results/{env_id}', latent_dim=policy_kwargs['latent_dim'], native_dim=env.action_space.shape[0])
+        W = decoder.weight.data.type(th.double)
+        self.mu = decoder.bias.data.unsqueeze(-1).type(th.double)
+        self.Phere = W @ W.T
 
         super(TD3Latent, self).__init__(
             policy,
@@ -158,22 +158,19 @@ class TD3Latent(OffPolicyAlgorithm):
 
             with th.no_grad():
                 # Select action according to policy and add clipped noise
-                noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
-                noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                next_actions = th.tanh(th.atanh(self.actor_target(replay_data.next_observations)) + noise)
-
-                # eps = 1e-7
                 # noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
                 # noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                # next_actions = (self.actor_target(replay_data.next_observations) + noise).clamp(-1+eps,1-eps)
-                # # before = copy.deepcopy(next_actions)
-                # next_actions = th.arctanh(next_actions)
-                # next_actions = next_actions - self.mu
-                # next_actions = (self.Phere @ next_actions.T).T
-                # next_actions += self.mu
-                # next_actions = th.tanh(next_actions)
-                # next_actions = next_actions.type(th.float)
-                # # print(next_actions)
+                # next_actions = th.tanh(th.atanh(self.actor_target(replay_data.next_observations)) + noise)
+
+                eps = 1e-7
+                noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
+                noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
+                next_actions = th.atanh(self.actor_target(replay_data.next_observations).clamp(-1+eps, +1-eps)) + noise
+                # before = copy.deepcopy(next_actions)
+                next_actions = (self.Phere @ (next_actions-self.mu).T).T + self.mu
+                next_actions = th.tanh(next_actions)
+                next_actions = next_actions.type(th.float)
+                # print(next_actions)
 
                 # Compute the next Q-values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
