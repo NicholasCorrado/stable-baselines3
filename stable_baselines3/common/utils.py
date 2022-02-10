@@ -514,14 +514,18 @@ def get_pca_layer(path_to_dir, latent_dim, native_dim, unsquashed=True):
     if unsquashed: suffix = "_unsquashed"
     else: suffix = "_squashed"
 
-    if latent_dim != -1:
-        W = np.load(f'{path_to_dir}/W{suffix}.npy')
-        W = W[:latent_dim, :].T
-        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
-    else:
+    if latent_dim == -1:
         latent_dim = native_dim
         W = np.eye(native_dim)
         mu = np.zeros(native_dim)
+    elif latent_dim == -2:
+        latent_dim = native_dim
+        W = np.eye(native_dim)
+        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
+    else:
+        W = np.load(f'{path_to_dir}/W{suffix}.npy')
+        W = W[:latent_dim, :].T
+        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
 
     native_dim = mu.shape[0]
     decoder = nn.Linear(latent_dim, native_dim)
