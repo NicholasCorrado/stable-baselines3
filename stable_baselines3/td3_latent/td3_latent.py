@@ -92,10 +92,6 @@ class TD3Latent(OffPolicyAlgorithm):
         env_id = env.envs[0].spec.id
         policy_kwargs['env_id'] = env_id
         policy_kwargs['action_noise'] = action_noise
-        decoder = get_pca_layer(f'./pca/pca_results/{env_id}', latent_dim=policy_kwargs['latent_dim'], native_dim=env.action_space.shape[0])
-        W = decoder.weight.data.type(th.double)
-        self.mu = decoder.bias.data.unsqueeze(-1).type(th.double)
-        self.Phere = W @ W.T
 
         super(TD3Latent, self).__init__(
             policy,

@@ -60,13 +60,14 @@ class Actor(BasePolicy):
 
         self.env_id = env_id
         self.use_latent = latent_dim != -1
-        print(f'latent_dim = {latent_dim}')
+        print(f'latent_dim = {latent_dim}, use_latent = {self.use_latent}')
 
         self.native_dim = get_action_dim(self.action_space)
-        self.latent_dim = latent_dim if self.use_latent else self.native_dim
         self.decoder = get_pca_layer(
             path_to_dir=f'./pca/pca_results/{self.env_id}',
-            latent_dim=self.latent_dim, native_dim=self.native_dim)
+            latent_dim=latent_dim, native_dim=self.native_dim)
+        # latent dim must beset after creating the decoder
+        self.latent_dim = latent_dim if latent_dim > 0 else self.native_dim
 
 
 

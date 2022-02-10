@@ -527,6 +527,9 @@ def get_pca_layer(path_to_dir, latent_dim, native_dim, unsquashed=True):
         W = W[:latent_dim, :].T
         mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
 
+    print('l', latent_dim)
+    print(W)
+    print(mu)
     native_dim = mu.shape[0]
     decoder = nn.Linear(latent_dim, native_dim)
 
