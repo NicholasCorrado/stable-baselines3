@@ -429,6 +429,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
             # Add noise to the action (improve exploration)
             if action_noise is not None:
+                # Noise is added inside policy with deterministic=False
                 scaled_action = np.clip(scaled_action, -1, 1)
                 # eps = 1e-7
                 # scaled_action = np.clip(scaled_action + action_noise(), -1+eps, 1-eps)

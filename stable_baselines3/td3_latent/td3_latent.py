@@ -158,19 +158,9 @@ class TD3Latent(OffPolicyAlgorithm):
 
             with th.no_grad():
                 # Select action according to policy and add clipped noise
-                # noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
-                # noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                # next_actions = th.tanh(th.atanh(self.actor_target(replay_data.next_observations)) + noise)
-
-                eps = 1e-7
                 noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
                 noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                next_actions = th.atanh(self.actor_target(replay_data.next_observations).clamp(-1+eps, +1-eps)) + noise
-                # before = copy.deepcopy(next_actions)
-                next_actions = (self.Phere @ (next_actions-self.mu).T).T + self.mu
-                next_actions = th.tanh(next_actions)
-                next_actions = next_actions.type(th.float)
-                # print(next_actions)
+                next_actions = th.tanh(th.atanh(self.actor_target(replay_data.next_observations, deterministic=False)) + noise)
 
                 # Compute the next Q-values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
