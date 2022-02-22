@@ -47,7 +47,7 @@ class Actor(BasePolicy):
             action_space,
             features_extractor=features_extractor,
             normalize_images=normalize_images,
-            squash_output=False,
+            squash_output=True,
         )
 
         self.net_arch = net_arch
@@ -55,7 +55,7 @@ class Actor(BasePolicy):
         self.activation_fn = activation_fn
 
         action_dim = get_action_dim(self.action_space)
-        actor_net = create_mlp(features_dim, action_dim, net_arch, activation_fn, squash_output=False)
+        actor_net = create_mlp(features_dim, action_dim, net_arch, activation_fn, squash_output=True)
         # Deterministic action
         self.mu = nn.Sequential(*actor_net)
 
@@ -128,7 +128,7 @@ class TD3Policy(BasePolicy):
             features_extractor_kwargs,
             optimizer_class=optimizer_class,
             optimizer_kwargs=optimizer_kwargs,
-            squash_output=False,
+            squash_output=True,
         )
 
         # Default network architecture, from the original paper
