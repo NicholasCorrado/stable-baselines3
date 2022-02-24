@@ -564,3 +564,52 @@ def load_pca_transformation_numpy(path_to_dir, latent_dim, native_dim, unsquashe
         mu = np.zeros(native_dim)
 
     return W, mu
+
+
+def get_decoder_stratified(path_to_dir, latent_dim, native_dim, unsquashed=True):
+
+    assert latent_dim is not None
+
+    decoders = []
+
+    if unsquashed: suffix = "_unsquashed"
+    else: suffix = "_squashed"
+
+    print(os.getcwd())
+
+    for i in range(100):
+        print('i =', i)
+        if latent_dim == -1:
+            dim = native_dim
+            W = np.eye(native_dim)
+            mu = np.zeros(native_dim)
+        elif latent_dim == -2:
+            dim = native_dim
+            W = np.eye(native_dim)
+            mu = np.load(f'{path_to_dir}/mu{suffix}_{i}.npy')
+        else:
+            dim = latent_dim
+            W = np.load(f'{path_to_dir}/W{suffix}_{i}.npy')
+            W = W[:dim, :].T
+            mu = np.load(f'{path_to_dir}/mu{suffix}_{i}.npy')
+
+        print('l', dim)
+        print(W)
+        print(mu)
+        native_dim = mu.shape[0]
+        decoder = nn.Linear(dim, native_dim)
+
+        W = torch.from_numpy(W)
+        if W.shape[0] == 1:
+            W = W.unsqueeze(0)
+        with torch.no_grad():
+            decoder.weight = torch.nn.Parameter(W)
+
+        mu_latent = torch.from_numpy(mu)
+        decoder.bias = torch.nn.Parameter(mu_latent)
+
+        decoder.requires_grad_(False)
+        decoder.type(torch.float)
+        decoders.append(decoder)
+
+    return decoders
