@@ -90,6 +90,8 @@ class TD3Latent(OffPolicyAlgorithm):
     ):
 
         env_id = env.envs[0].spec.id
+        # policy_kwargs = {}
+        # env_id = 'Swimmer20-v3'
         policy_kwargs['env_id'] = env_id
         policy_kwargs['action_noise'] = action_noise
 
@@ -156,7 +158,7 @@ class TD3Latent(OffPolicyAlgorithm):
                 # Select action according to policy and add clipped noise
                 noise = replay_data.actions.clone().data.normal_(0, self.target_policy_noise)
                 noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                next_actions = th.tanh(th.atanh(self.actor_target(replay_data.next_observations, deterministic=False)) + noise)
+                next_actions = th.tanh(th.atanh(self.actor_target(replay_data.next_observations, deterministic=True)) + noise)
 
                 # Compute the next Q-values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
@@ -193,6 +195,13 @@ class TD3Latent(OffPolicyAlgorithm):
         if len(actor_losses) > 0:
             self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
+        for name, param in self.actor.named_parameters():
+            if 'decoder' in name: continue
+            self.logger.record(f'train/actor_{name}.grad', th.norm(param.grad).detach().numpy().item())
+        for name, param in self.critic.named_parameters():
+            if 'decoder' in name: continue
+            self.logger.record(f'train/critic_{name}.grad', th.norm(param.grad).detach().numpy().item())
+        # self.logger.record(f'train/test', 1)
 
     def learn(
         self,
