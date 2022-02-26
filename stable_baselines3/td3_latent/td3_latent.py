@@ -195,12 +195,12 @@ class TD3Latent(OffPolicyAlgorithm):
         if len(actor_losses) > 0:
             self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
-        for name, param in self.actor.named_parameters():
-            if 'decoder' in name: continue
-            self.logger.record(f'train/actor_{name}.grad', th.norm(param.grad).detach().numpy().item())
-        for name, param in self.critic.named_parameters():
-            if 'decoder' in name: continue
-            self.logger.record(f'train/critic_{name}.grad', th.norm(param.grad).detach().numpy().item())
+        # for name, param in self.actor.named_parameters():
+        #     if 'decoder' in name: continue
+        #     self.logger.record(f'train/actor_{name}.grad', th.norm(param.grad).detach().numpy().item())
+        # for name, param in self.critic.named_parameters():
+        #     if 'decoder' in name: continue
+        #     self.logger.record(f'train/critic_{name}.grad', th.norm(param.grad).detach().numpy().item())
         # self.logger.record(f'train/test', 1)
 
     def learn(
