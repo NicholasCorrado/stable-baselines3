@@ -35,6 +35,7 @@ class Actor(BasePolicy):
     def __init__(
         self,
         latent_dim,
+        add_mu,
         env_id,
         action_noise,
         observation_space: gym.spaces.Space,
@@ -59,13 +60,14 @@ class Actor(BasePolicy):
         self.activation_fn = activation_fn
 
         self.env_id = env_id
+        self.add_mu = add_mu
         self.use_latent = latent_dim != -1
         print(f'latent_dim = {latent_dim}, use_latent = {self.use_latent}')
 
         self.native_dim = get_action_dim(self.action_space)
         self.decoder = get_pca_layer(
             path_to_dir=f'./pca/pca_results/{self.env_id}',
-            latent_dim=latent_dim, native_dim=self.native_dim)
+            latent_dim=latent_dim, native_dim=self.native_dim, add_mu=self.add_mu)
         # latent dim must beset after creating the decoder
         self.latent_dim = latent_dim if latent_dim > 0 else self.native_dim
 
@@ -145,6 +147,7 @@ class TD3LatentPolicy(BasePolicy):
         n_critics: int = 2,
         share_features_extractor: bool = True,
         latent_dim: Optional[int] = -1,
+        add_mu: Optional[bool] = True,
         env_id: Optional[str] = None,
         action_noise = None,
     ):
@@ -178,6 +181,7 @@ class TD3LatentPolicy(BasePolicy):
         }
         self.actor_kwargs = self.net_args.copy()
         self.actor_kwargs['latent_dim'] = latent_dim
+        self.actor_kwargs['add_mu'] = add_mu
         self.actor_kwargs['env_id'] = env_id
         self.actor_kwargs['action_noise'] = action_noise
 

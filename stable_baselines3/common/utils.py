@@ -507,7 +507,7 @@ def get_system_info(print_info: bool = True) -> Tuple[Dict[str, str], str]:
         print(env_info_str)
     return env_info, env_info_str
 
-def get_pca_layer(path_to_dir, latent_dim, native_dim, unsquashed=True):
+def get_pca_layer(path_to_dir, latent_dim, native_dim, unsquashed=True, add_mu=True):
 
     assert latent_dim is not None
 
@@ -517,15 +517,14 @@ def get_pca_layer(path_to_dir, latent_dim, native_dim, unsquashed=True):
     if latent_dim == -1:
         latent_dim = native_dim
         W = np.eye(native_dim)
-        mu = np.zeros(native_dim)
-    elif latent_dim == -2:
-        latent_dim = native_dim
-        W = np.eye(native_dim)
-        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
     else:
         W = np.load(f'{path_to_dir}/W{suffix}.npy')
         W = W[:latent_dim, :].T
+
+    if add_mu:
         mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
+    else:
+        mu = np.zeros(native_dim)
 
     print('l', latent_dim)
     print(W)
@@ -555,13 +554,21 @@ def load_pca_transformation_numpy(path_to_dir, latent_dim, native_dim, unsquashe
     if unsquashed: suffix = "_unsquashed"
     else: suffix = "_squashed"
 
-    if latent_dim != -1:
+    if latent_dim == -1:
+        W = np.eye(native_dim)
+        mu = np.zeros(native_dim)
+    elif latent_dim == -2:
+        W = np.eye(native_dim)
+        # mu = np.zeros(native_dim)
+        mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
+    elif latent_dim == -3:
+        W = np.load(f'{path_to_dir}/W{suffix}.npy')
+        mu = np.zeros(native_dim)
+    else:
         W = np.load(f'{path_to_dir}/W{suffix}.npy')
         W = W[:latent_dim, :].T
         mu = np.load(f'{path_to_dir}/mu{suffix}.npy')
-    else:
-        W = np.eye(native_dim)
-        mu = np.zeros(native_dim)
+
 
     return W, mu
 
