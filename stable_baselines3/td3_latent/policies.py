@@ -62,7 +62,7 @@ class Actor(BasePolicy):
         self.env_id = env_id
         self.add_mu = add_mu
         self.use_latent = latent_dim != -1
-        print(f'latent_dim = {latent_dim}, use_latent = {self.use_latent}')
+        # print(f'latent_dim = {latent_dim}, use_latent = {self.use_latent}')
 
         self.native_dim = get_action_dim(self.action_space)
         self.decoder = get_pca_layer(

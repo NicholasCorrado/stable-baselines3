@@ -92,6 +92,8 @@ class TD3Latent(OffPolicyAlgorithm):
         env_id = env.envs[0].spec.id
         # policy_kwargs = {}
         # env_id = 'Swimmer20-v3'
+        if not policy_kwargs: # empty dict == False, None == False
+            policy_kwargs = {'env_id': env_id, 'action_noise': action_noise, 'latent_dim': -1}
         policy_kwargs['env_id'] = env_id
         policy_kwargs['action_noise'] = action_noise
 
