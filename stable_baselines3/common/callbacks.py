@@ -300,6 +300,7 @@ class EvalCallback(EventCallback):
         eval_freq: int = 10000,
         log_path: Optional[str] = None,
         best_model_save_path: Optional[str] = None,
+        save_policy_path: Optional[bool] = False,
         deterministic: bool = True,
         render: bool = False,
         verbose: int = 1,
@@ -320,6 +321,7 @@ class EvalCallback(EventCallback):
 
         self.eval_env = eval_env
         self.best_model_save_path = best_model_save_path
+        self.save_policy_path = save_policy_path
         # Logs will be written in ``evaluations.npz``
         if log_path is not None:
             log_path = os.path.join(log_path, "evaluations")
@@ -425,6 +427,9 @@ class EvalCallback(EventCallback):
             # Dump log so the evaluation results are printed with the correct timestep
             self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
+
+            if self.save_policy_path:
+                self.model.save(os.path.join(self.best_model_save_path, f"model_{self.num_timesteps}"))
 
             if mean_reward > self.best_mean_reward:
                 if self.verbose > 0:
