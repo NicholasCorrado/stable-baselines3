@@ -300,7 +300,7 @@ class EvalCallback(EventCallback):
         eval_freq: int = 10000,
         log_path: Optional[str] = None,
         best_model_save_path: Optional[str] = None,
-        save_policy_path: Optional[bool] = False,
+        save_policy_path_freq: Optional[int] = -1,
         deterministic: bool = True,
         render: bool = False,
         verbose: int = 1,
@@ -321,7 +321,7 @@ class EvalCallback(EventCallback):
 
         self.eval_env = eval_env
         self.best_model_save_path = best_model_save_path
-        self.save_policy_path = save_policy_path
+        self.save_policy_path_freq = save_policy_path_freq
         # Logs will be written in ``evaluations.npz``
         if log_path is not None:
             log_path = os.path.join(log_path, "evaluations")
@@ -361,6 +361,9 @@ class EvalCallback(EventCallback):
                 self._is_success_buffer.append(maybe_is_success)
 
     def _on_step(self) -> bool:
+
+        if self.save_policy_path_freq > 0 and self.n_calls % self.save_policy_path_freq == 0:
+            self.model.save(os.path.join(self.best_model_save_path, f"model_{self.num_timesteps}"))
 
         if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
             # Sync training and eval env if there is VecNormalize
@@ -427,9 +430,6 @@ class EvalCallback(EventCallback):
             # Dump log so the evaluation results are printed with the correct timestep
             self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
-
-            if self.save_policy_path:
-                self.model.save(os.path.join(self.best_model_save_path, f"model_{self.num_timesteps}"))
 
             if mean_reward > self.best_mean_reward:
                 if self.verbose > 0:
